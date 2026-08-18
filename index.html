@@ -449,7 +449,7 @@ let dbReady = false;
 let allParticipants = [];
 let allTeams = new Set();
 let adminUnlocked = false;
-const ADMIN_PIN = 'BRIDGEIT4JESUS';
+const ADMIN_PIN = 'BridgeIT4Jesus';
 
 function initFirebase() {
   try {
@@ -1132,10 +1132,10 @@ async function exportFeedback() {
 
 // PIN verification
 function checkAdminPin() {
-  const pin = document.getElementById('adminPin').value;
+  const pin = document.getElementById('adminPin').value.trim();
   const pinStatus = document.getElementById('pinStatus');
-  
-  if (pin === ADMIN_PIN) {
+
+  if (pin.toLowerCase() === ADMIN_PIN.toLowerCase()) {
     adminUnlocked = true;
     document.getElementById('adminLocked').style.display = 'none';
     document.getElementById('adminUnlocked').style.display = 'block';
