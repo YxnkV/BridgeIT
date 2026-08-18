@@ -112,6 +112,20 @@
 
   .admin-grid{ display:grid; grid-template-columns:1fr 1fr; gap:20px; }
   @media (max-width:900px){ .admin-grid{ grid-template-columns:1fr; } }
+
+  .rank-item[data-part], .rank-item[data-team]{ cursor:pointer; transition:background .12s; }
+  .rank-item[data-part]:hover, .rank-item[data-team]:hover{ background:#eef2ff; border-radius:8px; }
+
+  .modal-overlay{ position:fixed; inset:0; background:rgba(15,23,42,0.55); display:none;
+    align-items:flex-start; justify-content:center; padding:40px 16px; overflow-y:auto; z-index:1000; }
+  .modal-overlay.open{ display:flex; }
+  .modal{ background:#fff; border-radius:12px; max-width:560px; width:100%; padding:24px;
+    box-shadow:0 20px 60px rgba(0,0,0,0.3); }
+  .modal-close{ float:right; background:none; border:none; font-size:24px; cursor:pointer;
+    color:var(--muted); line-height:1; padding:0 4px; }
+  .modal-close:hover{ color:var(--text); }
+  .detail-crit{ padding:10px 0; border-bottom:1px solid var(--border); }
+  .detail-crit:last-child{ border-bottom:none; }
 </style>
 </head>
 <body>
@@ -320,6 +334,13 @@
 
 </div>
 
+<div class="modal-overlay" id="detailModal">
+  <div class="modal">
+    <button class="modal-close" id="modalCloseBtn" aria-label="Close">&times;</button>
+    <div id="modalBody"></div>
+  </div>
+</div>
+
 <script>
 const OBSERVER_CRITERIA = [
   { key: 'criticalThinking', label: 'Critical Thinking & Problem Solving' },
@@ -454,7 +475,11 @@ function buildSliders(container, criteria) {
         <span class="band-chip band-0" id="chip-${c.key}">Not scored</span>
       </div>`;
     container.appendChild(div);
-    document.getElementById(`slider-${c.key}`).addEventListener('input', updatePreview);
+    const slider = document.getElementById(`slider-${c.key}`);
+    slider.addEventListener('input', () => {
+      updateChip(c.key, parseInt(slider.value, 10));
+      updatePreview();
+    });
   });
 }
 
@@ -482,10 +507,16 @@ function updateRoleUI() {
   updatePreview();
 }
 
+function teamSort(a, b) {
+  const na = parseInt(a, 10), nb = parseInt(b, 10);
+  if (!isNaN(na) && !isNaN(nb)) return na - nb;
+  return String(a).localeCompare(String(b));
+}
+
 async function populateTeamDropdown() {
   const select = document.getElementById('teamSelector');
   select.innerHTML = '<option value="">— Select team —</option>';
-  const teams = Array.from(allTeams).sort((a, b) => parseInt(a) - parseInt(b));
+  const teams = Array.from(allTeams).sort(teamSort);
   teams.forEach(t => {
     const opt = document.createElement('option');
     opt.value = t;
@@ -493,7 +524,7 @@ async function populateTeamDropdown() {
     select.appendChild(opt);
   });
   
-  select.addEventListener('change', populateParticipantDropdown);
+  select.onchange = populateParticipantDropdown;
 }
 
 async function populateParticipantDropdown() {
@@ -512,17 +543,17 @@ async function populateParticipantDropdown() {
     select.appendChild(opt);
   });
   
-  select.addEventListener('change', () => {
+  select.onchange = () => {
     const partNum = select.value;
     const part = allParticipants.find(p => p.participantNumber === partNum);
     document.getElementById('participantTeamConfirm').value = part ? `Team ${part.teamNumber}` : '';
-  });
+  };
 }
 
 async function populateJudgeTeamDropdown() {
   const select = document.getElementById('judgeTeamSelector');
   select.innerHTML = '<option value="">— Select team —</option>';
-  const teams = Array.from(allTeams).sort((a, b) => parseInt(a) - parseInt(b));
+  const teams = Array.from(allTeams).sort(teamSort);
   teams.forEach(t => {
     const opt = document.createElement('option');
     opt.value = t;
@@ -843,13 +874,24 @@ async function generateResults() {
       teamAvgs[tNum] = allScoresArr.length ? allScoresArr.reduce((a,b)=>a+b) / allScoresArr.length : 0;
     });
     
-    // Rank individuals
+    // Average of individual (observer) scores per team — the baseline for "team lifters"
+    const teamMemberAvgs = {};
+    Object.entries(participantAvgs).forEach(([pNum, avg]) => {
+      const part = allParticipants.find(p => p.participantNumber === pNum);
+      if (!part || !part.teamNumber) return;
+      (teamMemberAvgs[part.teamNumber] = teamMemberAvgs[part.teamNumber] || []).push(avg);
+    });
+    const teamIndividualAvgs = {};
+    Object.entries(teamMemberAvgs).forEach(([t, arr]) => {
+      teamIndividualAvgs[t] = arr.reduce((a, b) => a + b, 0) / arr.length;
+    });
+
+    // Rank individuals (delta = how far above their OWN team's average they scored)
     const rankedIndividuals = Object.entries(participantAvgs)
       .map(([pNum, avg]) => {
         const part = allParticipants.find(p => p.participantNumber === pNum);
-        const teamAvg = teamAvgs[part?.teamNumber] || 0;
-        const delta = avg - teamAvg;
-        return { pNum, avg, part, teamAvg, delta };
+        const teamBaseline = part ? (teamIndividualAvgs[part.teamNumber] || 0) : 0;
+        return { pNum, avg, part, teamBaseline, delta: avg - teamBaseline };
       })
       .sort((a, b) => b.avg - a.avg);
     
@@ -857,24 +899,36 @@ async function generateResults() {
     const rankedTeams = Object.entries(teamAvgs)
       .map(([tNum, avg]) => ({ tNum, avg }))
       .sort((a, b) => b.avg - a.avg);
+
+    // Stash for the click-through detail views
+    window.__RESULTS = { observerScores, judgeScores, participantAvgs, teamAvgs, teamIndividualAvgs, teamMemberAvgs };
+    const nameNum = (p) => `#${p.pNum}${p.part && p.part.name ? ' - ' + p.part.name : ''}`;
     
     let html = `<div class="results-grid">
       <div class="result-card">
         <div class="result-title">🏆 Best Team</div>`;
     
-    rankedTeams.slice(0, 3).forEach((t, idx) => {
-      html += `<div class="rank-item"><strong>${idx+1}. Team ${t.tNum}</strong><div class="rank-score">${t.avg.toFixed(1)}/5</div></div>`;
-    });
+    if (rankedTeams.length) {
+      rankedTeams.slice(0, 3).forEach((t, idx) => {
+        html += `<div class="rank-item" data-team="${t.tNum}"><strong>${idx+1}. Team ${t.tNum}</strong><div class="rank-score">${t.avg.toFixed(1)}/5 · tap for details</div></div>`;
+      });
+    } else {
+      html += `<p class="empty-note">No team (judge) scores yet.</p>`;
+    }
     
     html += `</div><div class="result-card">
       <div class="result-title">⭐ Best Individual</div>`;
     
-    rankedIndividuals.slice(0, 5).forEach((p, idx) => {
-      html += `<div class="rank-item">
-        <strong>${idx+1}. #${p.pNum}</strong> (Team ${p.part?.teamNumber || '—'})
-        <div class="rank-score">${p.avg.toFixed(1)}/5</div>
-      </div>`;
-    });
+    if (rankedIndividuals.length) {
+      rankedIndividuals.slice(0, 5).forEach((p, idx) => {
+        html += `<div class="rank-item" data-part="${p.pNum}">
+          <strong>${idx+1}. ${nameNum(p)}</strong> (Team ${p.part ? p.part.teamNumber : '—'})
+          <div class="rank-score">${p.avg.toFixed(1)}/5 · tap for details</div>
+        </div>`;
+      });
+    } else {
+      html += `<p class="empty-note">No individual (observer) scores yet.</p>`;
+    }
     
     html += `</div></div>`;
     
@@ -882,23 +936,145 @@ async function generateResults() {
     html += `<div class="result-card" style="margin-top:20px;">
       <div class="result-title">🚀 Team Lifters (MVPs)</div>`;
     
-    rankedIndividuals
-      .filter(p => p.delta > 0.5)
+    const lifters = rankedIndividuals
+      .filter(p => p.part && (teamMemberAvgs[p.part.teamNumber] || []).length > 1 && p.delta > 0.3)
       .sort((a, b) => b.delta - a.delta)
-      .slice(0, 5)
-      .forEach((p, idx) => {
-        html += `<div class="rank-item">
-          <strong>${idx+1}. #${p.pNum}</strong> lifted Team ${p.part?.teamNumber || '—'}
-          <div class="rank-score">+${p.delta.toFixed(1)} above team avg</div>
+      .slice(0, 5);
+
+    if (lifters.length) {
+      lifters.forEach((p, idx) => {
+        html += `<div class="rank-item" data-part="${p.pNum}">
+          <strong>${idx+1}. ${nameNum(p)}</strong> lifted Team ${p.part.teamNumber}
+          <div class="rank-score">+${p.delta.toFixed(1)} above their team average · tap for details</div>
         </div>`;
       });
-    
+    } else {
+      html += `<p class="empty-note">No standout lifters yet — this needs at least two scored members on a team, with one scoring clearly above the rest.</p>`;
+    }
+
     html += `</div>`;
     
     document.getElementById('resultsContainer').innerHTML = html;
   } catch (e) {
+    console.error('generateResults error:', e);
     alert('Error generating results.');
   }
+}
+
+// ===== Click-through detail views =====
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, ch => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[ch]));
+}
+
+function openDetail(html) {
+  document.getElementById('modalBody').innerHTML = html;
+  document.getElementById('detailModal').classList.add('open');
+}
+function closeDetail() {
+  document.getElementById('detailModal').classList.remove('open');
+}
+
+function handleDetailClick(e) {
+  const partEl = e.target.closest('[data-part]');
+  if (partEl) { e.preventDefault(); openDetail(renderParticipantDetail(partEl.dataset.part)); return; }
+  const teamEl = e.target.closest('[data-team]');
+  if (teamEl) { e.preventDefault(); openDetail(renderTeamDetail(teamEl.dataset.team)); return; }
+}
+
+function renderParticipantDetail(pNum) {
+  const R = window.__RESULTS || {};
+  const entries = (R.observerScores && R.observerScores[pNum]) || [];
+  const part = allParticipants.find(p => p.participantNumber === pNum);
+  const overall = R.participantAvgs ? (R.participantAvgs[pNum] || 0) : 0;
+
+  let html = `<div class="report-head">
+    <div class="pnum">#${pNum}${part && part.name ? ' · ' + escapeHtml(part.name) : ''}</div>
+    <div class="report-meta">Team ${part ? part.teamNumber : '—'} · ${entries.length} observer ${entries.length === 1 ? 'entry' : 'entries'}</div>
+  </div>`;
+
+  if (!entries.length) {
+    html += `<p class="empty-note">No observer scores recorded for this participant.</p>`;
+    return html;
+  }
+
+  html += `<p style="font-size:14px;font-weight:600;">Overall: ${overall.toFixed(1)}/5</p>`;
+  html += `<div class="section-label">Criteria</div>`;
+  OBSERVER_CRITERIA.forEach(c => {
+    const arr = entries.map(e => e.scores[c.key]).filter(v => v > 0);
+    if (!arr.length) return;
+    const avg = arr.reduce((a, b) => a + b, 0) / arr.length;
+    const idx = Math.min(4, Math.max(0, Math.round(avg) - 1));
+    html += `<div class="detail-crit">
+      <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:600;">
+        <span>${c.label}</span><span>${avg.toFixed(1)}/5</span>
+      </div>
+      <div style="font-size:12px;color:var(--muted);margin-top:4px;">${FEEDBACK_BANK[c.key][idx]}</div>
+    </div>`;
+  });
+
+  const imp = { yes: 0, maybe: 0, no: 0 };
+  entries.forEach(e => { if (e.impression && imp[e.impression] !== undefined) imp[e.impression]++; });
+  if (imp.yes || imp.maybe || imp.no) {
+    html += `<div class="section-label">Overall impression</div>
+      <p style="font-size:13px;">Yes: ${imp.yes} · Maybe: ${imp.maybe} · No: ${imp.no}</p>`;
+  }
+
+  const notes = entries.map(e => e.notes).filter(n => n && n.trim());
+  if (notes.length) {
+    html += `<div class="section-label">Observer notes</div><ul class="bullet-list">`;
+    notes.forEach(n => { html += `<li>${escapeHtml(n)}</li>`; });
+    html += `</ul>`;
+  }
+  return html;
+}
+
+function renderTeamDetail(tNum) {
+  const R = window.__RESULTS || {};
+  const entries = (R.judgeScores && R.judgeScores[tNum]) || [];
+  const overall = R.teamAvgs ? (R.teamAvgs[tNum] || 0) : 0;
+
+  let html = `<div class="report-head">
+    <div class="pnum">Team ${tNum}</div>
+    <div class="report-meta">${entries.length} judge ${entries.length === 1 ? 'entry' : 'entries'}</div>
+  </div>`;
+
+  if (entries.length) {
+    html += `<p style="font-size:14px;font-weight:600;">Team score: ${overall.toFixed(1)}/5</p>`;
+    html += `<div class="section-label">Judge criteria</div>`;
+    JUDGE_CRITERIA.forEach(c => {
+      const arr = entries.map(e => e.scores[c.key]).filter(v => v > 0);
+      if (!arr.length) return;
+      const avg = arr.reduce((a, b) => a + b, 0) / arr.length;
+      const idx = Math.min(4, Math.max(0, Math.round(avg) - 1));
+      html += `<div class="detail-crit">
+        <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:600;">
+          <span>${c.label}</span><span>${avg.toFixed(1)}/5</span>
+        </div>
+        <div style="font-size:12px;color:var(--muted);margin-top:4px;">${FEEDBACK_BANK[c.key][idx]}</div>
+      </div>`;
+    });
+    const jnotes = entries.map(e => e.notes).filter(n => n && n.trim());
+    if (jnotes.length) {
+      html += `<div class="section-label">Judge notes</div><ul class="bullet-list">`;
+      jnotes.forEach(n => { html += `<li>${escapeHtml(n)}</li>`; });
+      html += `</ul>`;
+    }
+  } else {
+    html += `<p class="empty-note">No judge scores recorded for this team yet.</p>`;
+  }
+
+  const members = allParticipants
+    .filter(p => p.teamNumber === tNum)
+    .sort((a, b) => (parseInt(a.participantNumber, 10) || 0) - (parseInt(b.participantNumber, 10) || 0));
+  if (members.length) {
+    html += `<div class="section-label">Members (tap to view)</div><ul class="bullet-list">`;
+    members.forEach(m => {
+      const avg = R.participantAvgs ? (R.participantAvgs[m.participantNumber] || 0) : 0;
+      html += `<li><a href="#" class="link-btn" data-part="${m.participantNumber}" style="padding:0;">#${m.participantNumber}${m.name ? ' - ' + escapeHtml(m.name) : ''}</a> — ${avg ? avg.toFixed(1) + '/5' : 'not scored'}</li>`;
+    });
+    html += `</ul>`;
+  }
+  return html;
 }
 
 // Export
@@ -1020,6 +1196,15 @@ document.getElementById('copyExportBtn').addEventListener('click', () => {
   document.execCommand('copy');
   alert('Copied to clipboard.');
 });
+
+// Detail modal + results click-through
+document.getElementById('resultsContainer').addEventListener('click', handleDetailClick);
+document.getElementById('modalBody').addEventListener('click', handleDetailClick);
+document.getElementById('modalCloseBtn').addEventListener('click', closeDetail);
+document.getElementById('detailModal').addEventListener('click', (e) => {
+  if (e.target.id === 'detailModal') closeDetail();
+});
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDetail(); });
 
 // Initialize
 initFirebase();
