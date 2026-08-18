@@ -1,0 +1,1030 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>BridgeIt Feedback Generator</title>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+<style>
+  :root{
+    --navy:#1e3a8a; --blue:#2f6fed; --bg:#f5f6fa; --card:#ffffff; --border:#e2e4ea;
+    --text:#1f2430; --muted:#6b7280; --success:#16a34a; --error:#dc2626;
+  }
+  *{ box-sizing:border-box; }
+  html, body{ margin:0; padding:0; }
+  body{ background:var(--bg); color:var(--text); font-family:-apple-system,"Segoe UI",Roboto,Arial,sans-serif; }
+  .wrap{ max-width:1200px; margin:0 auto; padding:16px 16px 60px; }
+
+  header{ background:var(--navy); color:#fff; border-radius:12px; padding:20px 24px; margin-bottom:20px; }
+  header h1{ margin:0 0 4px; font-size:22px; font-weight:700; }
+  header p{ margin:0; font-size:13px; color:#c7d3f5; }
+
+  .tabs{ display:flex; gap:0; margin-bottom:20px; border-bottom:2px solid var(--border); }
+  .tab-btn{ background:none; border:none; padding:14px 20px; font-size:14px; font-weight:600; color:var(--muted);
+    cursor:pointer; border-bottom:3px solid transparent; margin-bottom:-2px; }
+  .tab-btn.active{ color:var(--navy); border-bottom-color:var(--navy); }
+  .tab-btn:hover{ color:var(--text); }
+
+  .card{ background:var(--card); border:1px solid var(--border); border-radius:10px; padding:20px; margin-bottom:20px; }
+  h2{ font-size:16px; margin:0 0 16px; color:var(--navy); font-weight:700; }
+  h3{ font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); margin:0 0 10px; font-weight:600; }
+  label{ font-size:12px; color:var(--muted); display:block; margin-bottom:6px; font-weight:500; }
+  input[type=text], input[type=email], input[type=date], textarea, select{
+    width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:8px;
+    font-size:14px; font-family:inherit; color:var(--text); background:#fbfbfd;
+  }
+  input:focus, select:focus, textarea:focus{ outline:none; border-color:var(--blue); box-shadow:0 0 0 2px rgba(47,111,237,0.1); }
+  textarea{ resize:vertical; min-height:60px; }
+  select{ cursor:pointer; appearance:none; background-image:url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L6 6L11 1' stroke='%236b7280' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat:no-repeat; background-position:right 10px center; padding-right:30px; }
+
+  .row2{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  @media (max-width:600px){ .row2{ grid-template-columns:1fr; } }
+  .field{ margin-bottom:14px; }
+  .grid{ display:grid; grid-template-columns:1fr 1fr; gap:24px; }
+  @media (max-width:1000px){ .grid{ grid-template-columns:1fr; } }
+
+  .hero-section{ background:linear-gradient(135deg, #f0f9ff 0%, #fef3c7 100%); border:1px solid #bfdbfe;
+    border-radius:10px; padding:20px; margin-bottom:20px; }
+  .hero-label{ font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--navy); font-weight:700; margin-bottom:8px; }
+  .hero-select{ font-size:15px; font-weight:600; padding:12px 14px; }
+
+  .criterion{ margin-bottom:16px; padding-bottom:14px; border-bottom:1px solid var(--border); }
+  .criterion:last-child{ border-bottom:none; margin-bottom:0; padding-bottom:0; }
+  .crit-name{ font-size:13px; font-weight:600; margin-bottom:8px; display:block; }
+  .slider-row{ display:flex; align-items:center; gap:12px; }
+  input[type=range]{ flex:1; height:6px; -webkit-appearance:none; appearance:none; background:#e5e7eb; border-radius:3px; outline:none; }
+  input[type=range]::-webkit-slider-thumb{ -webkit-appearance:none; appearance:none; width:20px; height:20px; border-radius:50%; background:var(--blue); cursor:pointer; }
+  input[type=range]::-moz-range-thumb{ width:20px; height:20px; border-radius:50%; background:var(--blue); cursor:pointer; border:none; }
+  .band-chip{ min-width:100px; text-align:center; font-size:11px; font-weight:700; padding:5px 10px; border-radius:6px; color:#fff; white-space:nowrap; }
+  .band-0{ background:#c6c9d2; color:#4b4f5b; }
+
+  .impression-toggle{ display:flex; gap:8px; }
+  .toggle-btn{ flex:1; padding:10px 8px; border-radius:8px; border:1px solid var(--border); background:#fbfbfd; font-size:12px; font-weight:600; cursor:pointer; color:var(--text); }
+  .toggle-btn:hover{ background:#f3f4f6; }
+  .toggle-btn.active-yes{ background:var(--success); border-color:var(--success); color:#fff; }
+  .toggle-btn.active-maybe{ background:#f59e0b; border-color:#f59e0b; color:#fff; }
+  .toggle-btn.active-no{ background:var(--error); border-color:var(--error); color:#fff; }
+
+  button.primary{ background:var(--blue); color:#fff; border:none; border-radius:8px; padding:12px 20px; font-size:14px; font-weight:600; cursor:pointer; width:100%; }
+  button.primary:hover{ background:#255ecb; }
+  button.primary:active{ transform:scale(0.98); }
+  button.secondary{ background:#fff; color:var(--navy); border:1px solid var(--border); border-radius:8px; padding:10px 16px; font-size:13px; font-weight:600; cursor:pointer; }
+  button.secondary:hover{ background:#f9fafb; }
+  button.danger{ background:var(--error); color:#fff; border:none; border-radius:8px; padding:8px 12px; font-size:12px; cursor:pointer; }
+  button.danger:hover{ background:#b91c1c; }
+  .btn-row{ display:flex; gap:8px; margin-top:12px; flex-wrap:wrap; }
+  .status{ font-size:12px; color:var(--muted); margin-top:8px; min-height:16px; }
+  .status.success{ color:var(--success); }
+  .status.error{ color:var(--error); }
+
+  .report-head{ margin-bottom:14px; }
+  .pnum{ font-family:"Courier New",monospace; font-size:20px; font-weight:700; color:var(--navy); }
+  .report-meta{ font-size:12px; color:var(--muted); margin-top:4px; }
+  .section-label{ font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); margin:14px 0 8px; font-weight:600; }
+  .bullet-list{ margin:0; padding-left:18px; font-size:13px; line-height:1.6; }
+  .bullet-list li{ margin-bottom:6px; }
+  .empty-note{ color:var(--muted); font-size:13px; font-style:italic; }
+
+  table{ width:100%; border-collapse:collapse; font-size:13px; }
+  table th{ text-align:left; font-size:11px; text-transform:uppercase; color:var(--muted); padding:8px; border-bottom:1px solid var(--border); font-weight:600; }
+  table td{ padding:10px 8px; border-bottom:1px solid var(--border); }
+  table tr:hover{ background:#fafbfd; }
+  .link-btn{ background:none; border:none; color:var(--blue); cursor:pointer; font-size:12px; padding:2px 6px; font-weight:600; }
+  .link-btn:hover{ text-decoration:underline; }
+
+  .results-grid{ display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+  @media (max-width:900px){ .results-grid{ grid-template-columns:1fr; } }
+  .result-card{ background:#f9fafb; border:1px solid var(--border); border-radius:10px; padding:18px; }
+  .result-title{ font-size:14px; font-weight:700; color:var(--navy); margin-bottom:12px; }
+  .rank-item{ padding:10px; border-bottom:1px solid var(--border); }
+  .rank-item:last-child{ border-bottom:none; }
+  .rank-num{ font-weight:700; color:var(--navy); margin-right:6px; }
+  .rank-score{ color:var(--muted); font-size:12px; margin-top:2px; }
+
+  .search{ margin-bottom:12px; }
+  .toolbar{ display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; gap:10px; flex-wrap:wrap; }
+  #exportBox{ display:none; margin-top:12px; }
+  #exportBox textarea{ min-height:200px; font-family:"Courier New",monospace; font-size:11px; }
+  .tab-content{ display:none; }
+  .tab-content.active{ display:block; }
+
+  .admin-grid{ display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+  @media (max-width:900px){ .admin-grid{ grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <h1>BridgeIt feedback generator</h1>
+    <p>Independent observer and judge scoring. Clear individual and team winners.</p>
+  </header>
+
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="scoring">Scoring</button>
+    <button class="tab-btn" data-tab="results">Results</button>
+    <button class="tab-btn" data-tab="admin">Admin</button>
+  </div>
+
+  <!-- ============ SCORING TAB ============ -->
+  <div class="tab-content active" id="tab-scoring">
+    <div class="grid">
+
+      <div>
+        <div class="card">
+          <h2>Your info</h2>
+          <div class="field">
+            <label for="obsName">Your name</label>
+            <input type="text" id="obsName" placeholder="e.g. Serena" />
+          </div>
+          <div class="field">
+            <label for="obsRole">Your role</label>
+            <select id="obsRole">
+              <option value="">— Select role —</option>
+              <option value="observer">Observer (individual scoring)</option>
+              <option value="judge">Judge (team scoring)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- ============ OBSERVER SECTION ============ -->
+        <div id="observerSection" style="display:none;">
+          <div class="card">
+            <h2>Select participant</h2>
+            
+            <div class="hero-section">
+              <div class="hero-label">Step 1: Pick team</div>
+              <select id="teamSelector" class="hero-select">
+                <option value="">— Select team —</option>
+              </select>
+            </div>
+
+            <div class="hero-section">
+              <div class="hero-label">Step 2: Pick participant</div>
+              <select id="participantSelector" class="hero-select">
+                <option value="">— Select participant —</option>
+              </select>
+            </div>
+
+            <div class="field" style="margin-top:16px;">
+              <label for="participantTeamConfirm">Team (auto-filled)</label>
+              <input type="text" id="participantTeamConfirm" readonly style="background:#f3f4f6; cursor:not-allowed;" />
+            </div>
+          </div>
+
+          <div class="card">
+            <h2>Score this person</h2>
+            <h3>Individual criteria</h3>
+            <div id="observerCriteria"></div>
+
+            <div class="field" style="margin-top:20px;">
+              <label>Overall impression</label>
+              <div class="impression-toggle" id="impressionToggle">
+                <button type="button" class="toggle-btn" data-val="yes">Yes</button>
+                <button type="button" class="toggle-btn" data-val="maybe">Maybe</button>
+                <button type="button" class="toggle-btn" data-val="no">No</button>
+              </div>
+            </div>
+
+            <div class="field">
+              <label for="obsNotes">Notes (optional)</label>
+              <textarea id="obsNotes" placeholder="Specific observations..."></textarea>
+            </div>
+
+            <button class="primary" id="saveObserverBtn">Save entry</button>
+            <div class="status" id="saveStatus"></div>
+          </div>
+        </div>
+
+        <!-- ============ JUDGE SECTION ============ -->
+        <div id="judgeSection" style="display:none;">
+          <div class="card">
+            <h2>Select team</h2>
+            
+            <div class="hero-section">
+              <div class="hero-label">Which team are you scoring?</div>
+              <select id="judgeTeamSelector" class="hero-select">
+                <option value="">— Select team —</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="card">
+            <h2>Score this team</h2>
+            <h3>Team criteria</h3>
+            <div id="judgeCriteria"></div>
+
+            <div class="field" style="margin-top:20px;">
+              <label for="judgeNotes">Notes (optional)</label>
+              <textarea id="judgeNotes" placeholder="Feedback on team solution..."></textarea>
+            </div>
+
+            <button class="primary" id="saveJudgeBtn">Save entry</button>
+            <div class="status" id="saveJudgeStatus"></div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="card">
+          <h2>Preview</h2>
+          <div id="reportPreview"></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ============ RESULTS TAB ============ -->
+  <div class="tab-content" id="tab-results">
+    <div class="card">
+      <h2>Event results</h2>
+      <p style="font-size:13px; color:var(--muted); margin:0 0 16px;">Aggregated from all observer and judge entries.</p>
+      <button class="secondary" id="generateResultsBtn">Generate results</button>
+      <div id="resultsContainer" style="margin-top:20px;"></div>
+    </div>
+
+    <div class="card">
+      <h2>Export</h2>
+      <div class="btn-row">
+        <button class="secondary" id="exportFeedbackBtn">Participant feedback reports</button>
+        <button class="secondary" id="exportResultsBtn">Results summary</button>
+      </div>
+      <div id="exportBox">
+        <textarea id="exportText" readonly></textarea>
+        <div class="btn-row">
+          <button class="secondary" id="copyExportBtn">Copy to clipboard</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ ADMIN TAB ============ -->
+  <div class="tab-content" id="tab-admin">
+    <div id="adminLocked" style="display:none;">
+      <div class="card" style="max-width:400px; margin:40px auto; text-align:center;">
+        <h2>Admin access</h2>
+        <p style="color:var(--muted); margin-bottom:20px;">Enter PIN to access admin panel.</p>
+        <div class="field">
+          <input type="password" id="adminPin" placeholder="PIN" style="font-size:16px; text-align:center; letter-spacing:2px;" />
+        </div>
+        <button class="primary" id="adminUnlockBtn">Unlock</button>
+        <div class="status" id="pinStatus"></div>
+      </div>
+    </div>
+
+    <div id="adminUnlocked" style="display:none;">
+      <div class="admin-grid">
+        <div>
+          <div class="card">
+            <h2>Add participant</h2>
+          <div class="field">
+            <label for="adminPartNum">Participant #</label>
+            <input type="text" id="adminPartNum" placeholder="e.g. 001" />
+          </div>
+          <div class="field">
+            <label for="adminPartName">Name (optional)</label>
+            <input type="text" id="adminPartName" placeholder="e.g. Alice" />
+          </div>
+          <div class="field">
+            <label for="adminTeamNum">Team #</label>
+            <input type="text" id="adminTeamNum" placeholder="e.g. 1" />
+          </div>
+          <div class="field">
+            <label for="adminEmail">Email (optional)</label>
+            <input type="email" id="adminEmail" placeholder="alice@example.com" />
+          </div>
+          <button class="primary" id="addParticipantBtn">Add participant</button>
+          <div class="status" id="adminStatus"></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="card">
+          <div class="toolbar">
+            <h2 style="margin:0;">Participants</h2>
+            <button class="secondary" id="refreshParticipantsBtn">Refresh</button>
+          </div>
+          <input type="text" class="search" id="adminSearch" placeholder="Search..." />
+          <table>
+            <thead><tr><th>#</th><th>Name</th><th>Team</th><th>Email</th><th></th></tr></thead>
+            <tbody id="participantsList"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const OBSERVER_CRITERIA = [
+  { key: 'criticalThinking', label: 'Critical Thinking & Problem Solving' },
+  { key: 'communication', label: 'Communication (Discussion & Listening)' },
+  { key: 'leadership', label: 'Leadership' },
+  { key: 'attentionToDetail', label: 'Attention to Detail' },
+  { key: 'teamwork', label: 'Teamwork & Collaboration' },
+];
+
+const JUDGE_CRITERIA = [
+  { key: 'creativity', label: 'Creativity & Originality' },
+  { key: 'problemSolving', label: 'Problem Solving & Application' },
+  { key: 'feasibility', label: 'Feasibility' },
+  { key: 'communicationTeam', label: 'Communication & Delivery' },
+  { key: 'teamCollab', label: 'Team Collaboration' },
+];
+
+const FEEDBACK_BANK = {
+  criticalThinking: [
+    "In this round, you found it hard to engage directly with the challenge — try leaning in earlier and offering your own take, even a rough one, before the group settles on an approach.",
+    "You showed effort to understand the challenge, but your ideas could use more follow-through — push an idea from a starting point through to a fuller answer.",
+    "You analysed the challenge well and brought workable ideas to the table — a good foundation to build sharper, more original thinking from.",
+    "You identified the issues that mattered and developed practical, well-reasoned solutions — a real strength to keep leaning on.",
+    "You brought sharp, independent analysis and helped drive the team toward strong, well-justified solutions — genuinely standout thinking."
+  ],
+  communication: [
+    "You spoke up rarely during the session, or contributions were hard to follow — practising getting a clear point across early in a discussion will help.",
+    "You contributed sometimes, but ideas weren't always easy to follow, or listening back to the group was inconsistent — focus on both halves: speaking clearly and listening actively.",
+    "You expressed your ideas reasonably clearly and listened when others spoke — a solid, dependable communicator.",
+    "You expressed ideas clearly, listened actively, and added real value to the discussion — this came through well.",
+    "You communicated with real clarity, listened closely, and lifted the quality of the whole team's discussion — an exceptional strength."
+  ],
+  leadership: [
+    "You didn't take opportunities to guide or organise the group in this session — that's fine, but it's worth practising stepping in when the team needs direction.",
+    "You made some attempts to help organise the group, though they didn't land fully yet — keep experimenting with how you offer direction.",
+    "You provided guidance that helped move the team forward at points — a good base to build more consistent leadership from.",
+    "You guided and organised others effectively toward getting the task done — this is a clear strength.",
+    "You led naturally and consistently, bringing out the best in others and driving the team's progress — outstanding leadership."
+  ],
+  attentionToDetail: [
+    "A few important details were missed, or some contributions were less accurate than they could be — slowing down to double-check details will help.",
+    "You caught some details but missed others that mattered — building in a habit of a final detail-check before moving on would help.",
+    "You generally noticed relevant information and contributed reasonably accurate ideas — solid attention to detail.",
+    "You noticed important information, thought carefully, and contributed accurate, well-considered ideas — a clear strength.",
+    "You consistently caught details others missed and strengthened the team's output through precision — excellent attention to detail."
+  ],
+  teamwork: [
+    "You mostly worked apart from the group this round — leaning into the team's process more will help you get more from (and give more to) future sessions.",
+    "You worked with the team some of the time, but contribution was inconsistent — aim for steadier involvement throughout.",
+    "You worked constructively with others and contributed to the group's progress — a reliable team contributor.",
+    "You worked constructively with others, contributed meaningfully, and helped move the team forward — a clear strength.",
+    "You actively strengthened the team through support, encouragement, and consistent collaboration — an exceptional team player."
+  ],
+  creativity: [
+    "Idea lacks originality or is very basic.",
+    "Idea shows minimal creative effort; relies mostly on obvious or common approaches.",
+    "Some creative thinking shown but ideas are predictable.",
+    "Clear creative thinking with thoughtful ideas.",
+    "Highly innovative, unique, and insightful solution."
+  ],
+  problemSolving: [
+    "Solution does not clearly address the challenge.",
+    "Solution partially addresses the challenge but reasoning is shallow or inconsistent.",
+    "Addresses some aspects of the problem but lacks depth.",
+    "Solution clearly addresses the challenge in a practical way.",
+    "Solution is highly effective, well thought-out, and strongly connected to the problem."
+  ],
+  feasibility: [
+    "Solution is unrealistic or lacks practicality.",
+    "Solution has a few practical elements but overall feels difficult to implement.",
+    "Some practical elements but important gaps remain.",
+    "Solution is realistic and mostly achievable.",
+    "Solution is highly realistic, detailed, and achievable."
+  ],
+  communicationTeam: [
+    "Presentation lacks clarity, structure, or engagement.",
+    "Presentation has moments of clarity but overall structure or delivery is weak.",
+    "Message is understandable but inconsistent or unclear at times.",
+    "Clear, structured, and engaging presentation.",
+    "Highly confident, persuasive, polished, and engaging delivery."
+  ],
+  teamCollab: [
+    "Limited evidence of teamwork or balanced contribution.",
+    "Some team interaction visible, but contribution is dominated by one or two members.",
+    "Some collaboration shown but uneven participation.",
+    "Good teamwork, listening, and contribution from members.",
+    "Strong collaboration with clear support, listening, and balanced participation."
+  ]
+};
+
+const BAND_COLORS = ['#c6c9d2', '#dc2626', '#ea580c', '#d97706', '#2563eb', '#16a34a'];
+const BAND_NAMES = ['Not scored', 'Underachieving', 'Developing', 'Average', 'Proficient', 'Excellent'];
+
+const DEFAULT_FIREBASE_CONFIG = {
+  apiKey: "AIzaSyA1MpR8aSk0obih92HO4M7_ODRrJ2mPoxI",
+  authDomain: "bridgeit-base.firebaseapp.com",
+  projectId: "bridgeit-base",
+  storageBucket: "bridgeit-base.firebasestorage.app",
+  messagingSenderId: "309179178433",
+  appId: "1:309179178433:web:a31b84b4949c020b10a340"
+};
+
+let currentImpression = null;
+let db = null;
+let dbReady = false;
+let allParticipants = [];
+let allTeams = new Set();
+let adminUnlocked = false;
+const ADMIN_PIN = 'BRIDGEIT4JESUS';
+
+function initFirebase() {
+  try {
+    if (!firebase.apps || !firebase.apps.length) {
+      firebase.initializeApp(DEFAULT_FIREBASE_CONFIG);
+    }
+    db = firebase.firestore();
+    dbReady = true;
+  } catch (e) {
+    dbReady = false;
+  }
+}
+
+function buildSliders(container, criteria) {
+  container.innerHTML = '';
+  criteria.forEach(c => {
+    const div = document.createElement('div');
+    div.className = 'criterion';
+    div.innerHTML = `
+      <span class="crit-name">${c.label}</span>
+      <div class="slider-row">
+        <input type="range" min="0" max="5" step="1" value="0" id="slider-${c.key}" />
+        <span class="band-chip band-0" id="chip-${c.key}">Not scored</span>
+      </div>`;
+    container.appendChild(div);
+    document.getElementById(`slider-${c.key}`).addEventListener('input', updatePreview);
+  });
+}
+
+function updateChip(key, val) {
+  const chip = document.getElementById(`chip-${key}`);
+  if (!chip) return;
+  chip.textContent = BAND_NAMES[val];
+  chip.style.background = BAND_COLORS[val];
+  chip.style.color = val === 0 ? '#4b4f5b' : '#fff';
+}
+
+function updateRoleUI() {
+  const role = document.getElementById('obsRole').value;
+  document.getElementById('observerSection').style.display = role === 'observer' ? 'block' : 'none';
+  document.getElementById('judgeSection').style.display = role === 'judge' ? 'block' : 'none';
+  
+  if (role === 'observer') {
+    buildSliders(document.getElementById('observerCriteria'), OBSERVER_CRITERIA);
+    populateTeamDropdown();
+  } else if (role === 'judge') {
+    buildSliders(document.getElementById('judgeCriteria'), JUDGE_CRITERIA);
+    populateJudgeTeamDropdown();
+  }
+  
+  updatePreview();
+}
+
+async function populateTeamDropdown() {
+  const select = document.getElementById('teamSelector');
+  select.innerHTML = '<option value="">— Select team —</option>';
+  const teams = Array.from(allTeams).sort((a, b) => parseInt(a) - parseInt(b));
+  teams.forEach(t => {
+    const opt = document.createElement('option');
+    opt.value = t;
+    opt.textContent = `Team ${t}`;
+    select.appendChild(opt);
+  });
+  
+  select.addEventListener('change', populateParticipantDropdown);
+}
+
+async function populateParticipantDropdown() {
+  const teamNum = document.getElementById('teamSelector').value;
+  const select = document.getElementById('participantSelector');
+  select.innerHTML = '<option value="">— Select participant —</option>';
+  
+  if (!teamNum) return;
+  
+  const participants = allParticipants.filter(p => p.teamNumber === teamNum);
+  participants.sort((a, b) => parseInt(a.participantNumber) - parseInt(b.participantNumber));
+  participants.forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p.participantNumber;
+    opt.textContent = `#${p.participantNumber}${p.name ? ` - ${p.name}` : ''}`;
+    select.appendChild(opt);
+  });
+  
+  select.addEventListener('change', () => {
+    const partNum = select.value;
+    const part = allParticipants.find(p => p.participantNumber === partNum);
+    document.getElementById('participantTeamConfirm').value = part ? `Team ${part.teamNumber}` : '';
+  });
+}
+
+async function populateJudgeTeamDropdown() {
+  const select = document.getElementById('judgeTeamSelector');
+  select.innerHTML = '<option value="">— Select team —</option>';
+  const teams = Array.from(allTeams).sort((a, b) => parseInt(a) - parseInt(b));
+  teams.forEach(t => {
+    const opt = document.createElement('option');
+    opt.value = t;
+    opt.textContent = `Team ${t}`;
+    select.appendChild(opt);
+  });
+}
+
+async function loadParticipants() {
+  if (!dbReady) return;
+  try {
+    const snap = await db.collection('participants').get();
+    allParticipants = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    allTeams = new Set(allParticipants.map(p => p.teamNumber));
+    refreshParticipantsList();
+  } catch (e) {}
+}
+
+function getObserverRecord() {
+  const partNum = document.getElementById('participantSelector').value;
+  const part = allParticipants.find(p => p.participantNumber === partNum);
+  const scores = {};
+  OBSERVER_CRITERIA.forEach(c => {
+    scores[c.key] = parseInt(document.getElementById(`slider-${c.key}`).value, 10);
+  });
+  return {
+    type: 'observer',
+    participantNumber: partNum,
+    participantName: part ? part.name : '',
+    teamNumber: part ? part.teamNumber : '',
+    observerName: document.getElementById('obsName').value.trim(),
+    scores, impression: currentImpression,
+    notes: document.getElementById('obsNotes').value.trim(),
+    timestamp: Date.now()
+  };
+}
+
+function getJudgeRecord() {
+  const teamNum = document.getElementById('judgeTeamSelector').value;
+  const scores = {};
+  JUDGE_CRITERIA.forEach(c => {
+    scores[c.key] = parseInt(document.getElementById(`slider-${c.key}`).value, 10);
+  });
+  return {
+    type: 'judge',
+    teamNumber: teamNum,
+    judgeName: document.getElementById('obsName').value.trim(),
+    scores,
+    notes: document.getElementById('judgeNotes').value.trim(),
+    timestamp: Date.now()
+  };
+}
+
+async function saveObserverEntry() {
+  const record = getObserverRecord();
+  const statusEl = document.getElementById('saveStatus');
+  
+  if (!record.observerName || !record.participantNumber) {
+    statusEl.textContent = 'Enter your name and select participant.';
+    statusEl.classList.add('error');
+    return;
+  }
+  
+  try {
+    const entryId = `obs_${record.timestamp}_${record.observerName}`;
+    await db.collection('observer_scores').doc(entryId).set(record);
+    
+    statusEl.textContent = '✓ Entry saved.';
+    statusEl.classList.remove('error');
+    statusEl.classList.add('success');
+    setTimeout(() => { statusEl.textContent = ''; statusEl.classList.remove('success'); }, 2000);
+    
+    // Clear form
+    document.getElementById('participantSelector').value = '';
+    document.getElementById('participantTeamConfirm').value = '';
+    document.getElementById('obsNotes').value = '';
+    OBSERVER_CRITERIA.forEach(c => {
+      const slider = document.getElementById(`slider-${c.key}`);
+      if (slider) slider.value = 0;
+      updateChip(c.key, 0);
+    });
+    currentImpression = null;
+    refreshImpressionButtons();
+    updatePreview();
+  } catch (e) {
+    statusEl.textContent = 'Error saving entry.';
+    statusEl.classList.add('error');
+  }
+}
+
+async function saveJudgeEntry() {
+  const record = getJudgeRecord();
+  const statusEl = document.getElementById('saveJudgeStatus');
+  
+  if (!record.judgeName || !record.teamNumber) {
+    statusEl.textContent = 'Enter your name and select team.';
+    statusEl.classList.add('error');
+    return;
+  }
+  
+  try {
+    const entryId = `judge_${record.timestamp}_${record.judgeName}`;
+    await db.collection('judge_scores').doc(entryId).set(record);
+    
+    statusEl.textContent = '✓ Entry saved.';
+    statusEl.classList.remove('error');
+    statusEl.classList.add('success');
+    setTimeout(() => { statusEl.textContent = ''; statusEl.classList.remove('success'); }, 2000);
+    
+    // Clear form
+    document.getElementById('judgeTeamSelector').value = '';
+    document.getElementById('judgeNotes').value = '';
+    JUDGE_CRITERIA.forEach(c => {
+      const slider = document.getElementById(`slider-${c.key}`);
+      if (slider) slider.value = 0;
+      updateChip(c.key, 0);
+    });
+    updatePreview();
+  } catch (e) {
+    statusEl.textContent = 'Error saving entry.';
+    statusEl.classList.add('error');
+  }
+}
+
+function updatePreview() {
+  const role = document.getElementById('obsRole').value;
+  const el = document.getElementById('reportPreview');
+  
+  if (!role) {
+    el.innerHTML = `<p class="empty-note">Select your role to begin.</p>`;
+    return;
+  }
+  
+  if (role === 'observer') {
+    const record = getObserverRecord();
+    if (!record.participantNumber) {
+      el.innerHTML = `<p class="empty-note">Select a participant to preview feedback.</p>`;
+      return;
+    }
+    
+    const scored = OBSERVER_CRITERIA.filter(c => record.scores[c.key] > 0);
+    const avg = scored.length ? scored.reduce((s, c) => s + record.scores[c.key], 0) / scored.length : 0;
+    
+    let html = `<div class="report-head"><div class="pnum">#${record.participantNumber}</div><div class="report-meta">Team ${record.teamNumber}</div></div>`;
+    
+    if (scored.length) {
+      html += `<p style="font-size:13px;">Avg: ${avg.toFixed(1)}/5</p>`;
+      html += `<div class="section-label">Scores</div>`;
+      html += `<table style="font-size:12px;"><tr><td style="width:60%;">Criterion</td><td>Score</td><td>Feedback</td></tr>`;
+      OBSERVER_CRITERIA.forEach(c => {
+        const v = record.scores[c.key];
+        html += `<tr><td>${c.label}</td><td>${v || '—'}</td><td style="font-size:11px;">${v ? FEEDBACK_BANK[c.key][v-1] : ''}</td></tr>`;
+      });
+      html += `</table>`;
+    }
+    
+    el.innerHTML = html;
+  } else if (role === 'judge') {
+    const record = getJudgeRecord();
+    if (!record.teamNumber) {
+      el.innerHTML = `<p class="empty-note">Select a team to preview feedback.</p>`;
+      return;
+    }
+    
+    const scored = JUDGE_CRITERIA.filter(c => record.scores[c.key] > 0);
+    const avg = scored.length ? scored.reduce((s, c) => s + record.scores[c.key], 0) / scored.length : 0;
+    
+    let html = `<div class="report-head"><div class="pnum">Team ${record.teamNumber}</div></div>`;
+    
+    if (scored.length) {
+      html += `<p style="font-size:13px;">Avg: ${avg.toFixed(1)}/5</p>`;
+      html += `<div class="section-label">Scores</div>`;
+      html += `<table style="font-size:12px;"><tr><td style="width:60%;">Criterion</td><td>Score</td><td>Feedback</td></tr>`;
+      JUDGE_CRITERIA.forEach(c => {
+        const v = record.scores[c.key];
+        html += `<tr><td>${c.label}</td><td>${v || '—'}</td><td style="font-size:11px;">${v ? FEEDBACK_BANK[c.key][v-1] : ''}</td></tr>`;
+      });
+      html += `</table>`;
+    }
+    
+    el.innerHTML = html;
+  }
+}
+
+document.getElementById('obsRole').addEventListener('change', updateRoleUI);
+
+document.getElementById('impressionToggle').addEventListener('click', (e) => {
+  const btn = e.target.closest('.toggle-btn');
+  if (!btn) return;
+  currentImpression = currentImpression === btn.dataset.val ? null : btn.dataset.val;
+  refreshImpressionButtons();
+  updatePreview();
+});
+
+function refreshImpressionButtons() {
+  document.querySelectorAll('#impressionToggle .toggle-btn').forEach(btn => {
+    btn.classList.remove('active-yes', 'active-maybe', 'active-no');
+    if (btn.dataset.val === currentImpression) btn.classList.add('active-' + currentImpression);
+  });
+}
+
+// Admin functions
+async function addParticipant() {
+  const partNum = document.getElementById('adminPartNum').value.trim();
+  const name = document.getElementById('adminPartName').value.trim();
+  const teamNum = document.getElementById('adminTeamNum').value.trim();
+  const email = document.getElementById('adminEmail').value.trim();
+  const statusEl = document.getElementById('adminStatus');
+  
+  if (!partNum || !teamNum) {
+    statusEl.textContent = 'Enter participant # and team #.';
+    statusEl.classList.add('error');
+    return;
+  }
+  
+  if (!dbReady || !db) {
+    statusEl.textContent = 'Firebase not connected. Refresh the page.';
+    statusEl.classList.add('error');
+    console.error('Firebase not ready:', { dbReady, db });
+    return;
+  }
+  
+  try {
+    await db.collection('participants').doc(partNum).set({
+      participantNumber: partNum,
+      name: name || '',
+      teamNumber: teamNum,
+      email: email || '',
+      createdAt: Date.now()
+    });
+    
+    statusEl.textContent = '✓ Participant added.';
+    statusEl.classList.remove('error');
+    statusEl.classList.add('success');
+    
+    document.getElementById('adminPartNum').value = '';
+    document.getElementById('adminPartName').value = '';
+    document.getElementById('adminTeamNum').value = '';
+    document.getElementById('adminEmail').value = '';
+    
+    await loadParticipants();
+    updateRoleUI();
+  } catch (e) {
+    console.error('Add participant error:', e.message, e.code);
+    if (e.message.includes('permission-denied')) {
+      statusEl.textContent = 'Permission denied. Check Firebase Firestore rules or test mode may be expired. Refresh in Firebase console.';
+    } else if (e.message.includes('network')) {
+      statusEl.textContent = 'Network error. Check your internet connection.';
+    } else {
+      statusEl.textContent = `Error: ${e.message}`;
+    }
+    statusEl.classList.add('error');
+  }
+}
+
+async function deleteParticipant(partNum) {
+  if (!confirm(`Delete participant #${partNum}?`)) return;
+  try {
+    await db.collection('participants').doc(partNum).delete();
+    await loadParticipants();
+  } catch (e) {}
+}
+
+async function refreshParticipantsList() {
+  const body = document.getElementById('participantsList');
+  body.innerHTML = allParticipants.map(p => `
+    <tr>
+      <td>#${p.participantNumber}</td>
+      <td>${p.name || '—'}</td>
+      <td>Team ${p.teamNumber}</td>
+      <td>${p.email || '—'}</td>
+      <td><button class="danger" onclick="deleteParticipant('${p.participantNumber}')">Delete</button></td>
+    </tr>
+  `).join('');
+}
+
+// Results
+async function generateResults() {
+  if (!dbReady) { alert('Offline'); return; }
+  try {
+    const observerSnap = await db.collection('observer_scores').get();
+    const judgeSnap = await db.collection('judge_scores').get();
+    const allScores = [...observerSnap.docs.map(d => ({ type: 'observer', ...d.data() })), ...judgeSnap.docs.map(d => ({ type: 'judge', ...d.data() }))];
+    
+    const observerScores = {};
+    const judgeScores = {};
+    
+    allScores.forEach(s => {
+      if (s.type === 'observer') {
+        if (!observerScores[s.participantNumber]) observerScores[s.participantNumber] = [];
+        observerScores[s.participantNumber].push(s);
+      } else if (s.type === 'judge') {
+        if (!judgeScores[s.teamNumber]) judgeScores[s.teamNumber] = [];
+        judgeScores[s.teamNumber].push(s);
+      }
+    });
+    
+    // Calculate averages
+    const participantAvgs = {};
+    Object.entries(observerScores).forEach(([pNum, entries]) => {
+      const allScoresArr = [];
+      entries.forEach(e => {
+        OBSERVER_CRITERIA.forEach(c => {
+          if (e.scores[c.key] > 0) allScoresArr.push(e.scores[c.key]);
+        });
+      });
+      participantAvgs[pNum] = allScoresArr.length ? allScoresArr.reduce((a,b)=>a+b) / allScoresArr.length : 0;
+    });
+    
+    const teamAvgs = {};
+    Object.entries(judgeScores).forEach(([tNum, entries]) => {
+      const allScoresArr = [];
+      entries.forEach(e => {
+        JUDGE_CRITERIA.forEach(c => {
+          if (e.scores[c.key] > 0) allScoresArr.push(e.scores[c.key]);
+        });
+      });
+      teamAvgs[tNum] = allScoresArr.length ? allScoresArr.reduce((a,b)=>a+b) / allScoresArr.length : 0;
+    });
+    
+    // Rank individuals
+    const rankedIndividuals = Object.entries(participantAvgs)
+      .map(([pNum, avg]) => {
+        const part = allParticipants.find(p => p.participantNumber === pNum);
+        const teamAvg = teamAvgs[part?.teamNumber] || 0;
+        const delta = avg - teamAvg;
+        return { pNum, avg, part, teamAvg, delta };
+      })
+      .sort((a, b) => b.avg - a.avg);
+    
+    // Rank teams
+    const rankedTeams = Object.entries(teamAvgs)
+      .map(([tNum, avg]) => ({ tNum, avg }))
+      .sort((a, b) => b.avg - a.avg);
+    
+    let html = `<div class="results-grid">
+      <div class="result-card">
+        <div class="result-title">🏆 Best Team</div>`;
+    
+    rankedTeams.slice(0, 3).forEach((t, idx) => {
+      html += `<div class="rank-item"><strong>${idx+1}. Team ${t.tNum}</strong><div class="rank-score">${t.avg.toFixed(1)}/5</div></div>`;
+    });
+    
+    html += `</div><div class="result-card">
+      <div class="result-title">⭐ Best Individual</div>`;
+    
+    rankedIndividuals.slice(0, 5).forEach((p, idx) => {
+      html += `<div class="rank-item">
+        <strong>${idx+1}. #${p.pNum}</strong> (Team ${p.part?.teamNumber || '—'})
+        <div class="rank-score">${p.avg.toFixed(1)}/5</div>
+      </div>`;
+    });
+    
+    html += `</div></div>`;
+    
+    // MVPs
+    html += `<div class="result-card" style="margin-top:20px;">
+      <div class="result-title">🚀 Team Lifters (MVPs)</div>`;
+    
+    rankedIndividuals
+      .filter(p => p.delta > 0.5)
+      .sort((a, b) => b.delta - a.delta)
+      .slice(0, 5)
+      .forEach((p, idx) => {
+        html += `<div class="rank-item">
+          <strong>${idx+1}. #${p.pNum}</strong> lifted Team ${p.part?.teamNumber || '—'}
+          <div class="rank-score">+${p.delta.toFixed(1)} above team avg</div>
+        </div>`;
+      });
+    
+    html += `</div>`;
+    
+    document.getElementById('resultsContainer').innerHTML = html;
+  } catch (e) {
+    alert('Error generating results.');
+  }
+}
+
+// Export
+async function exportFeedback() {
+  if (!dbReady) { alert('Offline'); return; }
+  try {
+    const obsSnap = await db.collection('observer_scores').get();
+    const allScores = obsSnap.docs.map(d => d.data());
+    
+    const participantScores = {};
+    allScores.forEach(s => {
+      if (!participantScores[s.participantNumber]) participantScores[s.participantNumber] = [];
+      participantScores[s.participantNumber].push(s);
+    });
+    
+    let out = [];
+    Object.entries(participantScores).forEach(([pNum, entries]) => {
+      const part = allParticipants.find(p => p.participantNumber === pNum);
+      out.push(`PARTICIPANT #${pNum}${part?.name ? ' - ' + part.name : ''}`);
+      out.push(`Team ${part?.teamNumber || '—'} | Email: ${part?.email || '—'}`);
+      out.push('');
+      
+      const allScoresArr = [];
+      entries.forEach(e => {
+        OBSERVER_CRITERIA.forEach(c => {
+          if (e.scores[c.key] > 0) allScoresArr.push(e.scores[c.key]);
+        });
+      });
+      
+      const avg = allScoresArr.length ? allScoresArr.reduce((a,b)=>a+b) / allScoresArr.length : 0;
+      out.push(`Overall Performance: ${avg.toFixed(1)}/5`);
+      out.push('');
+      
+      out.push('FEEDBACK:');
+      OBSERVER_CRITERIA.forEach(c => {
+        const cScores = entries.map(e => e.scores[c.key]).filter(s => s > 0);
+        if (cScores.length) {
+          const cAvg = cScores.reduce((a,b)=>a+b) / cScores.length;
+          out.push(`${c.label}: ${cAvg.toFixed(1)}/5`);
+          out.push(`  "${FEEDBACK_BANK[c.key][Math.round(cAvg)-1]}"`);
+        }
+      });
+      
+      out.push('');
+      out.push('---');
+      out.push('');
+    });
+    
+    document.getElementById('exportText').value = out.join('\n');
+    document.getElementById('exportBox').style.display = 'block';
+  } catch (e) {
+    alert('Export error.');
+  }
+}
+
+// PIN verification
+function checkAdminPin() {
+  const pin = document.getElementById('adminPin').value;
+  const pinStatus = document.getElementById('pinStatus');
+  
+  if (pin === ADMIN_PIN) {
+    adminUnlocked = true;
+    document.getElementById('adminLocked').style.display = 'none';
+    document.getElementById('adminUnlocked').style.display = 'block';
+    pinStatus.textContent = '';
+    document.getElementById('adminPin').value = '';
+  } else {
+    pinStatus.textContent = 'Incorrect PIN.';
+    pinStatus.classList.add('error');
+    setTimeout(() => {
+      pinStatus.textContent = '';
+      pinStatus.classList.remove('error');
+    }, 2000);
+  }
+}
+
+document.getElementById('adminUnlockBtn').addEventListener('click', checkAdminPin);
+document.getElementById('adminPin').addEventListener('keypress', (e) => {
+  if (e.key === 'Enter') checkAdminPin();
+});
+
+// Tab switching with admin PIN check
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    if (btn.dataset.tab === 'admin' && !adminUnlocked) {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('tab-admin').classList.add('active');
+      document.getElementById('adminLocked').style.display = 'block';
+      document.getElementById('adminUnlocked').style.display = 'none';
+      return;
+    }
+    
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+    
+    if (btn.dataset.tab === 'admin' && adminUnlocked) {
+      document.getElementById('adminLocked').style.display = 'none';
+      document.getElementById('adminUnlocked').style.display = 'block';
+    }
+  });
+});
+
+// Event listeners
+document.getElementById('obsName').addEventListener('input', updatePreview);
+document.getElementById('obsNotes').addEventListener('input', updatePreview);
+document.getElementById('judgeNotes').addEventListener('input', updatePreview);
+document.getElementById('saveObserverBtn').addEventListener('click', saveObserverEntry);
+document.getElementById('saveJudgeBtn').addEventListener('click', saveJudgeEntry);
+document.getElementById('addParticipantBtn').addEventListener('click', addParticipant);
+document.getElementById('refreshParticipantsBtn').addEventListener('click', loadParticipants);
+document.getElementById('generateResultsBtn').addEventListener('click', generateResults);
+document.getElementById('exportFeedbackBtn').addEventListener('click', exportFeedback);
+document.getElementById('copyExportBtn').addEventListener('click', () => {
+  document.getElementById('exportText').select();
+  document.execCommand('copy');
+  alert('Copied to clipboard.');
+});
+
+// Initialize
+initFirebase();
+loadParticipants();
+updatePreview();
+</script>
+</body>
+</html>
